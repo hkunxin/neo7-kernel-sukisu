@@ -54,6 +54,9 @@ fetch_source() {
 
 # ---------------------------------------------------------------- 2. 配置
 apply_config() {
+  log "预处理源码树（补悬空 Kconfig/Makefile 引用）"
+  python3 "$ROOT/scripts/prepare_tree.py" "$SRC"
+
   log "应用原厂 config（本机 105 提取，$(wc -l < "$CONFIG_IN") 行）"
   cp "$CONFIG_IN" "$SRC/arch/arm64/configs/neo7_defconfig"
   make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 neo7_defconfig >/dev/null

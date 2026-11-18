@@ -99,12 +99,15 @@ jobs:
           SUSFS_REF: ${{ inputs.susfs_ref }}
           KERNEL_COMMIT: ${{ inputs.kernel_commit }}
         run: |
+          set -o pipefail
           export PATH="/usr/lib/ccache:$PATH"
           bash scripts/build.sh 2>&1 | tee build.log
           ccache -s || true
 
       - name: 打包 boot.img 与 AK3
-        run: bash scripts/package.sh 2>&1 | tee package.log
+        run: |
+          set -o pipefail
+          bash scripts/package.sh 2>&1 | tee package.log
 
       - name: 上传产物
         if: always()
