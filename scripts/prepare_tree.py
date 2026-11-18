@@ -65,48 +65,26 @@ for root, _dirs, files in os.walk(src):
 
 
 # ---------------------------------------------------------------- 悬空 include
-# 例：kernel/sched/core.c 里 #include "../locking/locking_main.h"，
-# 而 kernel/locking/locking_main.h 是 symlink 到 vendor/oplus/...（未公开）。
-# zip 归档有时连残骸都不留，所以直接按「被 include 的相对路径」补空桩。
-INC_RE = re.compile(r'^\s*#\s*include\s+[<"]([^">]+)[">]', re.M)
-SKIP_PREFIX = ("linux/", "asm/", "asm-generic/", "uapi/", "generated/", "trace/",
-               "net/", "crypto/", "sound/", "media/", "dt-bindings/", "kunit/",
-               "vdso/", "soc/", "rdma/", "misc/", "drm/", "keys/", "kvm/")
+# OPLUS 把若干头文件做成 symlink 指向 vendor/oplus/...（未公开），zip 归档里
+# 有时连残骸都不留，而内核却无条件 include 它们。按显式清单补空桩，可审计、不误伤：
+# 这些头只提供 OPLUS 私有锁/调度实现，关掉对应 CONFIG 后内核不引用其中任何符号。
+STUB_HEADERS = [
+    "kernel/locking/locking_main.h",      # kernel/sched/core.c 无条件 include
+    "kernel/locking/sa_common_struct.h",  # OPLUS 锁实现公共结构
+    "mm/mm-trace.h",                      # mm/vmscan.c include
+]
 
-for root, _dirs, files in os.walk(src):
-    if os.sep + ".git" in root:
+for rel in STUB_HEADERS:
+    target = os.path.join(src, rel)
+    if os.path.isfile(target) and os.path.getsize(target) > 0:
         continue
-    for f in files:
-        if not f.endswith((".c", ".h", ".S")):
-            continue
-        path = os.path.join(root, f)
-        try:
-            text = read(path)
-        except OSError:
-            continue
-        if "#include" not in text:
-            continue
-        for m in INC_RE.finditer(text):
-            rel = m.group(1)
-            # 只处理 OPLUS 的典型写法：跨目录相对 include（../vendor 方向的软链）
-            if not rel.startswith("../"):
-                continue
-            if "$" in rel:
-                continue
-            cand = os.path.normpath(os.path.join(root, rel))
-            if not cand.startswith(src):
-                continue
-            if os.path.exists(cand) or os.path.exists(os.path.normpath(os.path.join(src, rel))):
-                continue
-            try:
-                os.makedirs(os.path.dirname(cand), exist_ok=True)
-                with open(cand, "w", encoding="utf-8", newline="\n") as fh:
-                    fh.write(f"/* [prepare] stub: {rel} included by "
-                             f"{os.path.relpath(path, src)} but not published */\n")
-                changes.append(("stub-include", os.path.relpath(cand, src),
-                                os.path.relpath(path, src)))
-            except OSError as exc:
-                changes.append(("stub-failed", rel, str(exc)))
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(f"/* [prepare] stub: {rel} is a symlink to unpublished vendor/oplus source */\n")
+        changes.append(("stub-header", rel, "explicit"))
+    except OSError as exc:
+        changes.append(("stub-failed", rel, str(exc)))
 
 SRC_RE = re.compile(r'^(\s*)source\s+"([^"]+)"\s*$', re.M)
 
