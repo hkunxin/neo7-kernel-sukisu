@@ -122,8 +122,30 @@ apply_susfs() {
     echo "已注入 CONFIG_KSU_SUSFS 开关"
   fi
 
-  ( cd "$SRC" && patch -p1 --forward --no-backup-if-mismatch < "$patch" ) \
-    || die "SUSFS 内核补丁应用失败，见上方 patch 输出"
+  # 主补丁：OPLUS 树上有且仅有一个 hunk（namespace.c 的 include 块）必然失败，
+  # 因为它的后置上下文里有本树不存在的 <trace/hooks/blk.h>，用 -F3 也不能消除。
+  # 这里允许它失败，但必须严格断言「只失败这一个」，其他任何 reject 都算硬错误。
+  log "应用 SUSFS 主补丁（-F3，允许 namespace.c 的 include hunk 失败）"
+  set +e
+  ( cd "$SRC" && patch -p1 -F3 --forward --no-backup-if-mismatch < "$patch" ) \
+    | tee "$WORK/susfs-patch.log"
+  local prc=${PIPESTATUS[0]}
+  set -e
+  local rej
+  rej=$(find "$SRC" -name '*.rej' | sed "s|^$SRC/||" | sort | tr '\n' ' ')
+  if [[ "$rej" != "fs/namespace.c.rej " ]]; then
+    die "SUSFS 补丁失败范围超出预期（rejected: ${rej:-无}），检查 $WORK/susfs-patch.log"
+  fi
+  echo "预期内失败：fs/namespace.c（include 块），改用 fixup 重放"
+  find "$SRC" -name '*.rej' -delete
+  find "$SRC" -name '*.orig' -delete
+
+  ( cd "$SRC" && patch -p1 -F3 --forward --no-backup-if-mismatch \
+      < "$ROOT/patches/susfs_namespace_fixup.patch" ) \
+    || die "namespace.c fixup 应用失败"
+  grep -q "CL_COPY_MNT_NS" "$SRC/fs/namespace.c" || die "fixup 未生效"
+  find "$SRC" -name '*.rej' -delete
+  echo "[OK] namespace.c include 块已用 fixup 补齐（patch 退出码 $prc）"
 
   # susfs.c 需要的 susfs_is_current_ksu_domain() 由 KSU 提供，Nova 侧叫 is_ksu_domain()
   cp "$ROOT/patches/susfs_ksu_compat.c" "$SRC/fs/susfs_ksu_compat.c"

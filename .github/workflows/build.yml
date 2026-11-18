@@ -98,8 +98,8 @@ jobs:
           KSU_REF: ${{ inputs.ksu_ref }}
           SUSFS_REF: ${{ inputs.susfs_ref }}
           KERNEL_COMMIT: ${{ inputs.kernel_commit }}
-          PATH: /usr/lib/ccache:${{ env.PATH }}
         run: |
+          export PATH="/usr/lib/ccache:$PATH"
           bash scripts/build.sh 2>&1 | tee build.log
           ccache -s || true
 
@@ -107,10 +107,11 @@ jobs:
         run: bash scripts/package.sh 2>&1 | tee package.log
 
       - name: 上传产物
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: kernel-${{ inputs.ksu }}-susfs${{ inputs.susfs }}
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 14
           path: |
             dist/Image
