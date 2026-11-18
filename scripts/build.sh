@@ -41,9 +41,11 @@ fetch_source() {
   mkdir -p "$WORK"
   local zip="$WORK/kernel-${KERNEL_COMMIT:0:12}.zip"
   if [[ ! -s "$zip" ]]; then
-    curl -fL --retry 5 --retry-delay 5 -o "$zip" \
-      "https://codeload.github.com/${KERNEL_REPO}/zip/${KERNEL_COMMIT}"
+    curl -fL -sS --retry 5 --retry-delay 5 -o "$zip" \
+      "https://codeload.github.com/${KERNEL_REPO}/zip/${KERNEL_COMMIT}" \
+      || die "源码下载失败"
   fi
+  echo "源码包：$(du -h "$zip" | cut -f1)"
   unzip -q "$zip" -d "$WORK/.src"
   local d
   d="$(find "$WORK/.src" -maxdepth 1 -mindepth 1 -type d | head -n1)"

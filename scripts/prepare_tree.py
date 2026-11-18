@@ -14,6 +14,22 @@ import sys
 
 src = sys.argv[1]
 stubs = []
+skipped = []
+
+
+def safe_mkdir_and_write(target, content):
+    """父路径可能是「symlink 被 zip 落成普通文件」的残骸，失败就跳过而不是崩。"""
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.isdir(target):
+            return False
+        with open(target, "w", encoding="utf-8") as fh:
+            fh.write(content)
+        return True
+    except OSError as exc:
+        skipped.append((target, exc))
+        return False
+
 
 # 1. Kconfig: source "xxx/Kconfig"
 for root, _dirs, files in os.walk(src):
@@ -32,10 +48,8 @@ for root, _dirs, files in os.walk(src):
             target = os.path.normpath(os.path.join(root, rel))
             if os.path.exists(target):
                 continue
-            os.makedirs(os.path.dirname(target), exist_ok=True)
-            with open(target, "w", encoding="utf-8") as fh:
-                fh.write(f"# stub for unpublished OPLUS source: {rel}\n")
-            stubs.append(("Kconfig", os.path.relpath(target, src)))
+            if safe_mkdir_and_write(target, f"# stub for unpublished OPLUS source: {rel}\n"):
+                stubs.append(("Kconfig", os.path.relpath(target, src)))
 
 # 2. Makefile: obj-y += some/dir/ 且该目录不存在
 for root, _dirs, files in os.walk(src):
@@ -48,14 +62,14 @@ for root, _dirs, files in os.walk(src):
         text = open(path, encoding="utf-8", errors="replace").read()
     except OSError:
         continue
-    for m in re.finditer(r'^\s*obj-[^\s]*\s*\+=\s*([\w./-]+)/\s*$', text, re.M):
-        d = os.path.normpath(os.path.join(root, m.group(1)))
-        if os.path.isdir(d):
-            continue
-        os.makedirs(d, exist_ok=True)
-        open(os.path.join(d, "Makefile"), "w", encoding="utf-8").write(
-            f"# stub for unpublished OPLUS dir: {m.group(1)}\n")
-        stubs.append(("Makefile", os.path.relpath(d, src)))
+        for m in re.finditer(r'^\s*obj-[^\s]*\s*\+=\s*([\w./-]+)/\s*$', text, re.M):
+            d = os.path.normpath(os.path.join(root, m.group(1)))
+            if os.path.exists(d):
+                continue
+            if safe_mkdir_and_write(
+                    os.path.join(d, "Makefile"),
+                    f"# stub for unpublished OPLUS dir: {m.group(1)}\n"):
+                stubs.append(("Makefile", os.path.relpath(d, src)))
 
 if stubs:
     print(f"[prepare] 补齐 {len(stubs)} 处悬空引用：")
@@ -63,3 +77,8 @@ if stubs:
         print(f"  - [{kind}] {p}")
 else:
     print("[prepare] 无需补齐，树是完整的")
+
+if skipped:
+    print(f"[prepare] 跳过 {len(skipped)} 处（父路径被 symlink 残骸占用，非致命）：")
+    for target, exc in skipped[:20]:
+        print(f"  - {target}: {exc}")
