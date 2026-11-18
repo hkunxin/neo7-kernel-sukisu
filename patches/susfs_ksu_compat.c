@@ -25,8 +25,8 @@ bool susfs_is_current_ksu_domain(void)
 }
 
 /* 静态键置 false：static_branch_unlikely() 恒不成立，相关分支不会被编译进快路径。
- * 注意 6.1 的 struct static_key_true 内含 .key 字段，初始化要用 STATIC_KEY_FALSE_INIT。 */
-struct static_key_true ksu_is_init_rc_hook_enabled = STATIC_KEY_FALSE_INIT;
+ * 注意 6.1 的 struct static_key_true 内含 .key 字段，STATIC_KEY_FALSE_INIT 类型不兼容。 */
+struct static_key_true ksu_is_init_rc_hook_enabled = { .key = STATIC_KEY_INIT_FALSE };
 
 void ksu_handle_sys_read(unsigned int fd)
 {
