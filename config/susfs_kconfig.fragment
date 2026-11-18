@@ -53,3 +53,11 @@ config KSU_SUSFS_PRIORITY_UID_FILTER
 	bool "PRIORITY_UID_FILTER"
 	depends on KSU_SUSFS
 	default n
+
+config KSU_SUSFS_ENABLE_LOG
+	bool "SUSFS logging"
+	depends on KSU_SUSFS
+	default y
+	help
+	  susfs.c 的 SUSFS_LOGI_RL/SUSFS_LOGE_RL 只在这个开关打开时才定义，
+	  上游 #else 分支漏了这两个宏，关掉会直接编译失败。
