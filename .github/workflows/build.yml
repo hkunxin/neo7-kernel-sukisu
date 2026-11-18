@@ -78,18 +78,25 @@ jobs:
 
       - name: 下载工具链（Clang 20 r547379）
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/work"
-          cd "$GITHUB_WORKSPACE/work"
-          aria2c -q -s16 -x16 -k1M \
-            "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip" -o clang.zip
-          aria2c -q -s16 -x16 -k1M \
-            "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/build-tools.zip" -o build-tools.zip
-          mkdir -p clang && unzip -q clang.zip -d clang
-          unzip -q build-tools.zip
-          CLANG_BIN="$(dirname "$(find "$PWD/clang" -name clang -type f | head -n1)")"
+          set -euxo pipefail
+          WS="${GITHUB_WORKSPACE:-$PWD}"
+          mkdir -p "$WS/work"
+          cd "$WS/work"
+          df -h .
+          dl() {
+            aria2c -q -s16 -x16 -k1M "$1" -o "$2" || curl -fL --retry 5 -o "$2" "$1"
+            test -s "$2"
+          }
+          dl "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip" clang.zip
+          dl "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/build-tools.zip" build-tools.zip
+          mkdir -p clang && unzip -q -o clang.zip -d clang
+          unzip -q -o build-tools.zip
+          CLANG_BIN="$(dirname "$(find "$PWD/clang" -name clang -type f -perm -u+x | head -n1)")"
+          test -x "$CLANG_BIN/clang"
           echo "$CLANG_BIN" >> "$GITHUB_PATH"
           echo "$PWD/build-tools/bin" >> "$GITHUB_PATH"
           "$CLANG_BIN/clang" --version | head -n1
+          df -h .
 
       - name: 编译
         env:
