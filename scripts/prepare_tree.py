@@ -29,6 +29,41 @@ def write(path, text):
         fh.write(text)
 
 
+def symlink_target(path):
+    """zip 把 symlink 落成普通文件，内容就是目标路径；不是残骸则返回 None。"""
+    try:
+        if not os.path.isfile(path) or os.path.getsize(path) > 512:
+            return None
+        text = read(path).strip()
+        if not text or "\n" in text or " " in text or "/" not in text:
+            return None
+        return text
+    except OSError:
+        return None
+
+
+# ---------------------------------------------------------------- 悬空软链
+# 例：kernel/locking/locking_main.h -> ../../../vendor/oplus/kernel/synchronize/oplus_locking.h
+# 目标不在公开树里。头文件补空桩（很多文件只是 include 一下，并未真正使用），
+# 源文件交给下面的 Makefile 规则处理。
+for root, _dirs, files in os.walk(src):
+    if os.sep + ".git" in root:
+        continue
+    for f in files:
+        path = os.path.join(root, f)
+        target = symlink_target(path)
+        if target is None:
+            continue
+        resolved = os.path.normpath(os.path.join(root, target))
+        if os.path.exists(resolved):
+            continue
+        if f.endswith(".h"):
+            write(path, f"/* [prepare] stub: upstream symlink to {target} is unpublished */\n")
+            changes.append(("stub-header", os.path.relpath(path, src), target))
+        else:
+            changes.append(("dangling", os.path.relpath(path, src), target))
+
+
 # ---------------------------------------------------------------- Kconfig
 SRC_RE = re.compile(r'^(\s*)source\s+"([^"]+)"\s*$', re.M)
 
@@ -68,7 +103,8 @@ for root, _dirs, files in os.walk(src):
             write(path, new)
 
 # ---------------------------------------------------------------- Makefile
-OBJ_RE = re.compile(r'^(\s*)(obj-[^\s]*\s*\+=\s*)([\w./-]+)/\s*$', re.M)
+OBJ_DIR_RE = re.compile(r'^(\s*)(obj-[^\s]*\s*\+=\s*)([\w./-]+)/\s*$', re.M)
+OBJ_OBJ_RE = re.compile(r'^(\s*)(obj-[^\s]*\s*\+=\s*)([\w./-]+)\.o\s*$', re.M)
 
 for root, _dirs, files in os.walk(src):
     if os.sep + ".git" in root:
@@ -89,7 +125,16 @@ for root, _dirs, files in os.walk(src):
         changes.append(("Makefile", os.path.relpath(path, src), d + "/"))
         return f"{indent}# {prefix}{d}/   # [prepare] missing upstream"
 
-    new = OBJ_RE.sub(repl2, text)
+    def repl3(m):
+        indent, prefix, name = m.group(1), m.group(2), m.group(3)
+        base = os.path.normpath(os.path.join(root, name))
+        # .o 需要同名 .c/.S 存在，否则就是指向未公开源文件的悬空引用
+        if any(os.path.isfile(base + ext) for ext in (".c", ".S", ".s")):
+            return m.group(0)
+        changes.append(("Makefile", os.path.relpath(path, src), name + ".o"))
+        return f"{indent}# {prefix}{name}.o   # [prepare] missing upstream"
+
+    new = OBJ_OBJ_RE.sub(repl3, OBJ_DIR_RE.sub(repl2, text))
     if new != text:
         write(path, new)
 

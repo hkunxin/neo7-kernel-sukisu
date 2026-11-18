@@ -23,7 +23,7 @@ SUSFS_REPO="${SUSFS_REPO:-https://gitlab.com/simonpunk/susfs4ksu}"
 SUSFS_REF="${SUSFS_REF:-gki-android14-6.1}"
 KERNEL_REPO="${KERNEL_REPO:-OnePlusOSS/android_kernel_oneplus_mt6989}"
 KERNEL_COMMIT="${KERNEL_COMMIT:-822beed40827f1e9a103bc06ab4714a670080b72}"
-CONFIG_IN="${CONFIG_IN:-$ROOT/config/rmx5060_105_stock.config}"
+CONFIG_IN="${CONFIG_IN:-$ROOT/config/base_6.1.157.config}"
 
 # 与 vendor_dlkm 模块的 vermagic 逐字一致，改这里等于让 270+ 个模块全部加载失败
 EXPECTED_RELEASE="${EXPECTED_RELEASE:-6.1.157-android14-11-o-g7335883bfebb}"
@@ -59,7 +59,7 @@ apply_config() {
   log "预处理源码树（补悬空 Kconfig/Makefile 引用）"
   python3 "$ROOT/scripts/prepare_tree.py" "$SRC"
 
-  log "应用原厂 config（本机 105 提取，$(wc -l < "$CONFIG_IN") 行）"
+  log "应用配置基线（$(basename "$CONFIG_IN")，$(wc -l < "$CONFIG_IN") 行）"
   cp "$CONFIG_IN" "$SRC/arch/arm64/configs/neo7_defconfig"
   make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 neo7_defconfig >/dev/null
 
