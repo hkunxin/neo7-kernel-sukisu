@@ -1,0 +1,14 @@
+# SUSFS 内核侧开关（追加到 out/.config，再 olddefconfig 归一化）
+# 这些符号由 config/susfs_kconfig.fragment 注入到 KernelSU 的 Kconfig 后才存在，
+# 所以必须在 apply_susfs 之后写入，不能和 base config 一起做。
+CONFIG_KSU_SUSFS=y
+CONFIG_KSU_SUSFS_SUS_PATH=y
+CONFIG_KSU_SUSFS_SUS_MOUNT=y
+CONFIG_KSU_SUSFS_SUS_KSTAT=y
+CONFIG_KSU_SUSFS_SUS_MAP=y
+CONFIG_KSU_SUSFS_SPOOF_UNAME=y
+CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y
+CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
+CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y
+# 只在需要按 uid 过滤时开，默认关（与社区常用配置一致）
+# CONFIG_KSU_SUSFS_PRIORITY_UID_FILTER is not set

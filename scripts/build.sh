@@ -85,11 +85,6 @@ EOS
   "$SRC/scripts/config" --file "$OUT/.config" \
     --set-str MODULE_SIG_KEY "certs/signing_key.pem"
 
-  if [[ -f "$ROOT/config/sukisu.fragment" && "$KSU" != "none" ]]; then
-    log "追加 SukiSU 配置片段"
-    cat "$ROOT/config/sukisu.fragment" >> "$OUT/.config"
-  fi
-
   make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 olddefconfig >/dev/null
 
   # 记录「这颗内核比原厂少了哪些配置项」——换源后能不能开机的核心判据
@@ -112,16 +107,16 @@ apply_sukisu() {
     "https://codeload.github.com/${KSU_REPO}/zip/${KSU_REF}"
   rm -rf "$WORK/.ksu"
   unzip -q "$zip" -d "$WORK/.ksu"
-  rm -rf "$WORK/KernelSU"
-  mv "$(find "$WORK/.ksu" -maxdepth 1 -mindepth 1 -type d | head -n1)" "$WORK/KernelSU"
+  rm -rf "$SRC/KernelSU"
+  mv "$(find "$WORK/.ksu" -maxdepth 1 -mindepth 1 -type d | head -n1)" "$SRC/KernelSU"
   rm -rf "$WORK/.ksu"
 
-  ln -sfn ../KernelSU/kernel "$SRC/drivers/kernelsu"
+  ln -sfn ../KernelSU/kernel "$SRC/drivers/kernelsu"   # 相对 drivers/ -> $SRC/KernelSU
   grep -q "obj-\$(CONFIG_KSU) += kernelsu/" "$SRC/drivers/Makefile" \
     || echo 'obj-$(CONFIG_KSU) += kernelsu/' >> "$SRC/drivers/Makefile"
   grep -q 'drivers/kernelsu/Kconfig' "$SRC/drivers/Kconfig" \
     || sed -i '$i source "drivers/kernelsu/Kconfig"' "$SRC/drivers/Kconfig"
-  echo "KernelSU 提交：$(cd "$WORK/KernelSU" && git rev-parse HEAD 2>/dev/null || echo "$KSU_REF")"
+  echo "KernelSU 提交：$(cd "$SRC/KernelSU" && git rev-parse HEAD 2>/dev/null || echo "$KSU_REF")"
 }
 
 apply_susfs() {
@@ -139,8 +134,8 @@ apply_susfs() {
 
   # SukiSU-Nova 的 Kconfig 已不含 CONFIG_KSU_SUSFS，先补一个最小开关，
   # 否则 fs/Makefile 里的 obj-$(CONFIG_KSU_SUSFS) 永远不生效。
-  if ! grep -q "config KSU_SUSFS$" "$WORK/KernelSU/kernel/Kconfig" 2>/dev/null; then
-    cat "$ROOT/config/susfs_kconfig.fragment" >> "$WORK/KernelSU/kernel/Kconfig"
+  if ! grep -q "config KSU_SUSFS$" "$SRC/KernelSU/kernel/Kconfig" 2>/dev/null; then
+    cat "$ROOT/config/susfs_kconfig.fragment" >> "$SRC/KernelSU/kernel/Kconfig"
     echo "已注入 CONFIG_KSU_SUSFS 开关"
   fi
 
@@ -174,6 +169,25 @@ apply_susfs() {
   grep -q "susfs_ksu_compat" "$SRC/fs/Makefile" \
     || echo 'obj-$(CONFIG_KSU_SUSFS) += susfs_ksu_compat.o' >> "$SRC/fs/Makefile"
   echo "SUSFS 提交：$(cd "$WORK/susfs4ksu" && git rev-parse --short HEAD)"
+}
+
+# ------------------------------------------------------- 3.5 root/隐藏配置
+apply_root_config() {
+  [[ "$KSU" != "none" || "$SUSFS" == "1" ]] || return 0
+  log "写入 KSU/SUSFS 配置并重新归一化"
+  [[ "$KSU" != "none" ]] && cat "$ROOT/config/sukisu.fragment" >> "$OUT/.config"
+  [[ "$SUSFS" == "1" ]] && cat "$ROOT/config/susfs.fragment" >> "$OUT/.config"
+  make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 olddefconfig >/dev/null
+
+  for k in CONFIG_PREEMPT=y CONFIG_MODULE_UNLOAD=y CONFIG_MODVERSIONS=y CONFIG_ARM64=y; do
+    grep -qx "$k" "$OUT/.config" || die "config 缺少 $k，vermagic 会与官方不一致"
+  done
+  [[ "$KSU" == "none" ]] || grep -qx "CONFIG_KSU=y" "$OUT/.config" \
+    || die "CONFIG_KSU 未生效，Kconfig 注入或 drivers/kernelsu 软链有问题"
+  if [[ "$SUSFS" == "1" ]]; then
+    grep -qx "CONFIG_KSU_SUSFS=y" "$OUT/.config" || die "CONFIG_KSU_SUSFS 未生效"
+  fi
+  echo "[OK] KSU=$(grep -c '^CONFIG_KSU=y' "$OUT/.config") SUSFS=$(grep -c '^CONFIG_KSU_SUSFS=y' "$OUT/.config")"
 }
 
 # ---------------------------------------------------------------- 4. 编译
@@ -221,6 +235,7 @@ fetch_source
 apply_config
 apply_sukisu
 apply_susfs
+apply_root_config
 build_kernel
 verify
 log "完成：$DIST"
