@@ -72,8 +72,10 @@ apply_config() {
   "$SRC/scripts/config" --file "$OUT/.config" --disable LOCALVERSION_AUTO
   cat > "$SRC/scripts/setlocalversion" <<'EOS'
 #!/bin/sh
-# [054] 固定版本串：必须与 vendor_dlkm 模块 vermagic 完全一致
-echo "$LOCALVERSION_FORCE"
+# [054] 固定版本串：必须与 vendor_dlkm 模块 vermagic 完全一致。
+# 注意：OPLUS 的 Makefile 会在版本号后自己补一个 "-"，这里不能再带前导连字符，
+# 否则会得到 "6.1.157--android14-11-..."。
+echo "${LOCALVERSION_FORCE#-}"
 EOS
   chmod +x "$SRC/scripts/setlocalversion"
   export LOCALVERSION_FORCE="-${EXPECTED_RELEASE#6.1.157}"
