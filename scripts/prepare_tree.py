@@ -181,8 +181,11 @@ for root, _dirs, files in os.walk(src):
                 name = tok[:-2]
                 ok = any(os.path.isfile(base + ext) for ext in (".c", ".S", ".s"))
                 if not ok:
-                    # 复合对象（kvm.o 由 kvm-y := ... 拼出来）没有同名 .c，不能删
-                    ok = bool(re.search(rf'^{re.escape(name)}(-|\s*[:+]?=)', text, re.M))
+                    # 复合对象（kvm.o 由 kvm-y := ... 拼出来）或带显式规则的对象
+                    # （relo_core.o 由 tools/lib/bpf 生成）没有同名 .c，不能删
+                    ok = bool(re.search(rf'^{re.escape(name)}(-|\s*[:+]?=)', text, re.M)) \
+                        or bool(re.search(rf'{re.escape(name)}\.o\s*:', text)) \
+                        or f'$(obj)/{name}.o' in text
             else:
                 ok = True
             (keep if ok else dropped).append(tok)
@@ -198,6 +201,44 @@ for root, _dirs, files in os.walk(src):
     new = OBJ_LINE_RE.sub(repl_line, text)
     if new != text:
         write(path, new)
+
+# ---------------------------------------------------------------- 锁 handler 桩
+# kernel/locking/*.c 里以 extern 声明并直接调用了 OPLUS 的锁统计 handler，
+# 而它们的实现在 vendor/oplus/kernel/synchronize/oplus_locking.c（未公开）。
+# 这些 handler 只做竞争统计/上报，置空不影响加锁语义。原型取自各调用方文件。
+LOCKING_STUB = "kernel/locking/oplus_locking_stub.c"
+if not os.path.isfile(os.path.join(src, LOCKING_STUB)):
+    with open(os.path.join(src, LOCKING_STUB), "w", encoding="utf-8", newline="\n") as fh:
+        fh.write('''/* [prepare] stub: OPLUS 锁统计 handler（原实现位于未公开的 vendor/oplus/kernel/synchronize/oplus_locking.c） */
+#include <linux/types.h>
+#include <linux/sched.h>
+#include <linux/mutex.h>
+#include <linux/rwsem.h>
+#include <linux/rtmutex.h>
+#include <linux/percpu-rwsem.h>
+
+void mutex_lock_handler(u64 lock, struct task_struct *tsk, unsigned long jiffies)
+{ (void)lock; (void)tsk; (void)jiffies; }
+void mutex_wait_handler(struct mutex *lock) { (void)lock; }
+void rtmutex_lock_handler(u64 lock, struct task_struct *tsk, unsigned long jiffies)
+{ (void)lock; (void)tsk; (void)jiffies; }
+void rtmutex_wait_handler(struct rt_mutex_base *lock) { (void)lock; }
+void rwsem_lock_handler(u64 sem, struct task_struct *tsk, unsigned long jiffies)
+{ (void)sem; (void)tsk; (void)jiffies; }
+void rwsem_read_wait_handler(struct rw_semaphore *sem) { (void)sem; }
+void android_vh_pcpu_rwsem_handler(u64 sem, struct task_struct *tsk, unsigned long jiffies)
+{ (void)sem; (void)tsk; (void)jiffies; }
+void pcp_wait_handler(struct percpu_rw_semaphore *sem, bool is_reader, int phase)
+{ (void)sem; (void)is_reader; (void)phase; }
+''')
+    changes.append(("stub-source", LOCKING_STUB, "locking handlers"))
+
+lk_mk = os.path.join(src, "kernel/locking/Makefile")
+if os.path.isfile(lk_mk):
+    t = read(lk_mk)
+    if "oplus_locking_stub.o" not in t:
+        write(lk_mk, t.rstrip("\n") + "\nobj-y += oplus_locking_stub.o\n")
+        changes.append(("Makefile", "kernel/locking/Makefile", "+= oplus_locking_stub.o"))
 
 print(f"[prepare] 处理 {len(changes)} 处未公开依赖")
 for kind, where, what in changes[:40]:
