@@ -178,7 +178,11 @@ for root, _dirs, files in os.walk(src):
                 ok = os.path.isdir(d)
             elif tok.endswith(".o"):
                 base = os.path.normpath(os.path.join(root, tok[:-2]))
+                name = tok[:-2]
                 ok = any(os.path.isfile(base + ext) for ext in (".c", ".S", ".s"))
+                if not ok:
+                    # 复合对象（kvm.o 由 kvm-y := ... 拼出来）没有同名 .c，不能删
+                    ok = bool(re.search(rf'^{re.escape(name)}(-|\s*[:+]?=)', text, re.M))
             else:
                 ok = True
             (keep if ok else dropped).append(tok)
