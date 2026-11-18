@@ -144,8 +144,9 @@ for root, _dirs, files in os.walk(src):
             write(path, new)
 
 # ---------------------------------------------------------------- Makefile
-OBJ_DIR_RE = re.compile(r'^(\s*)(obj-[^\s]*\s*\+=\s*)([\w./-]+)/\s*$', re.M)
-OBJ_OBJ_RE = re.compile(r'^(\s*)(obj-[^\s]*\s*\+=\s*)([\w./-]+)\.o\s*$', re.M)
+# 一行可能挂多个目标（obj-y += a.o b.o c/ d.o），逐个判断，缺的从行里摘掉并
+# 追加到注释里，保留原样便于审计。
+OBJ_LINE_RE = re.compile(r'^(\s*)(obj-[^\s]*\s*\+=\s*)(\S.*?)\s*$', re.M)
 
 for root, _dirs, files in os.walk(src):
     if os.sep + ".git" in root:
@@ -158,24 +159,31 @@ for root, _dirs, files in os.walk(src):
     except OSError:
         continue
 
-    def repl2(m):
-        indent, prefix, d = m.group(1), m.group(2), m.group(3)
-        full = os.path.normpath(os.path.join(root, d))
-        if os.path.isdir(full):
+    def repl_line(m):
+        indent, prefix, body = m.group(1), m.group(2), m.group(3)
+        if "$(" in body:  # 变量展开的列表不动
             return m.group(0)
-        changes.append(("Makefile", os.path.relpath(path, src), d + "/"))
-        return f"{indent}# {prefix}{d}/   # [prepare] missing upstream"
-
-    def repl3(m):
-        indent, prefix, name = m.group(1), m.group(2), m.group(3)
-        base = os.path.normpath(os.path.join(root, name))
-        # .o 需要同名 .c/.S 存在，否则就是指向未公开源文件的悬空引用
-        if any(os.path.isfile(base + ext) for ext in (".c", ".S", ".s")):
+        keep, dropped = [], []
+        for tok in body.split():
+            if tok.endswith("/"):
+                d = os.path.normpath(os.path.join(root, tok.rstrip("/")))
+                ok = os.path.isdir(d)
+            elif tok.endswith(".o"):
+                base = os.path.normpath(os.path.join(root, tok[:-2]))
+                ok = any(os.path.isfile(base + ext) for ext in (".c", ".S", ".s"))
+            else:
+                ok = True
+            (keep if ok else dropped).append(tok)
+        if not dropped:
             return m.group(0)
-        changes.append(("Makefile", os.path.relpath(path, src), name + ".o"))
-        return f"{indent}# {prefix}{name}.o   # [prepare] missing upstream"
+        for tok in dropped:
+            changes.append(("Makefile", os.path.relpath(path, src), tok))
+        if not keep:
+            return f"{indent}# {prefix}{' '.join(dropped)}   # [prepare] missing upstream"
+        return (f"{indent}{prefix}{' '.join(keep)}"
+                f"   # [prepare] dropped: {' '.join(dropped)}")
 
-    new = OBJ_OBJ_RE.sub(repl3, OBJ_DIR_RE.sub(repl2, text))
+    new = OBJ_LINE_RE.sub(repl_line, text)
     if new != text:
         write(path, new)
 

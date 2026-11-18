@@ -72,6 +72,11 @@ apply_config() {
   # setlocalversion 在非 git 目录 / 有改动时可能追加 -dirty，直接掐掉来源
   sed -i 's/ -dirty//g' "$SRC/scripts/setlocalversion" || true
 
+  # 原厂 config 指向 certs/mtk_signing_key.pem（MTK 私有签名密钥，未随源码发布），
+  # 改回内核自带的自动生成密钥；MODULE_SIG_ALL 未开，不会真的签任何模块。
+  "$SRC/scripts/config" --file "$OUT/.config" \
+    --set-str MODULE_SIG_KEY "certs/signing_key.pem"
+
   if [[ -f "$ROOT/config/sukisu.fragment" && "$KSU" != "none" ]]; then
     log "追加 SukiSU 配置片段"
     cat "$ROOT/config/sukisu.fragment" >> "$OUT/.config"
