@@ -83,9 +83,14 @@ static inline void locking_record_switch_in_cs(struct task_struct *p) { (void)p;
 #define _OPLUS_SA_COMMON_STRUCT_STUB_H
 #endif
 """,
-    "mm/mm-trace.h": """/* [prepare] stub: 原文件是 symlink 指向 vendor/oplus/kernel/mm/mm_osvelte/mm-trace.h */
+    "mm/mm-trace.h": """/* [prepare] stub: 原文件是 symlink 指向 vendor/oplus/kernel/mm/mm_osvelte/mm-trace.h
+ * OPLUS 的 mm 事件埋点，只做统计上报；这里全部置空，不改变回收/分配语义。
+ */
 #ifndef _OPLUS_MM_TRACE_STUB_H
 #define _OPLUS_MM_TRACE_STUB_H
+#define mm_trace_int64(...)     do { } while (0)
+#define mm_trace_fmt_begin(...) do { } while (0)
+#define mm_trace_fmt_end(...)   do { } while (0)
 #endif
 """,
 }
