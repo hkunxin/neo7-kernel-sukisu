@@ -77,6 +77,10 @@ apply_config() {
 
   make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 olddefconfig >/dev/null
 
+  # 记录「这颗内核比原厂少了哪些配置项」——换源后能不能开机的核心判据
+  mkdir -p "$DIST"
+  python3 "$ROOT/scripts/config_diff.py" "$CONFIG_IN" "$OUT/.config" "$DIST/config.diff.txt"
+
   # vermagic 依赖这几项，缺一不可
   for k in CONFIG_PREEMPT=y CONFIG_MODULE_UNLOAD=y CONFIG_MODVERSIONS=y CONFIG_ARM64=y; do
     grep -qx "$k" "$OUT/.config" || die "config 缺少 $k，vermagic 会与官方不一致"
