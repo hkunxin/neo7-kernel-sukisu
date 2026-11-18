@@ -53,8 +53,8 @@ for root, _dirs, files in os.walk(src):
             else:
                 target = os.path.normpath(os.path.join(src, rel))
             sibling = os.path.normpath(os.path.join(root, rel))
-            # 内核里 source 基本相对 srctree，少数相对自身目录，两者存在即正常
-            if os.path.exists(target) or os.path.exists(sibling):
+            # source 必须指向真实文件；symlink 残骸（普通文件/空目录）不算
+            if os.path.isfile(target) or os.path.isfile(sibling):
                 return m.group(0)
             changes.append(("Kconfig", os.path.relpath(path, src), rel))
             return f'{indent}# source "{rel}"   # [prepare] missing upstream'
