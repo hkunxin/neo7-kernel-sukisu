@@ -63,14 +63,20 @@ apply_config() {
   cp "$CONFIG_IN" "$SRC/arch/arm64/configs/neo7_defconfig"
   make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 neo7_defconfig >/dev/null
 
-  # 钉死 UTS_RELEASE：原厂 CONFIG_LOCALVERSION 为空，后缀由 setlocalversion 生成，
-  # 换源后哈希必然不同，必须整体钉住才能与 vendor 模块 vermagic 对齐。
-  "$SRC/scripts/config" --file "$OUT/.config" \
-    --set-str LOCALVERSION "-${EXPECTED_RELEASE#6.1.157}"
+  # 钉死 UTS_RELEASE。
+  # 原厂 CONFIG_LOCALVERSION 为空，后缀由 OPLUS 改造过的 scripts/setlocalversion
+  # 拼出来（-android14-11 + -g<hash>）；换源后哈希必然不同，而且这个脚本在
+  # Actions 里会因为外层 git 仓库误判而多出 "-" / "+"。这里直接把它替换成
+  # 固定输出，保证与 vendor_dlkm 模块的 vermagic 逐字一致。
+  "$SRC/scripts/config" --file "$OUT/.config" --set-str LOCALVERSION ""
   "$SRC/scripts/config" --file "$OUT/.config" --disable LOCALVERSION_AUTO
-
-  # setlocalversion 在非 git 目录 / 有改动时可能追加 -dirty，直接掐掉来源
-  sed -i 's/ -dirty//g' "$SRC/scripts/setlocalversion" || true
+  cat > "$SRC/scripts/setlocalversion" <<'EOS'
+#!/bin/sh
+# [054] 固定版本串：必须与 vendor_dlkm 模块 vermagic 完全一致
+echo "$LOCALVERSION_FORCE"
+EOS
+  chmod +x "$SRC/scripts/setlocalversion"
+  export LOCALVERSION_FORCE="-${EXPECTED_RELEASE#6.1.157}"
 
   # 原厂 config 指向 certs/mtk_signing_key.pem（MTK 私有签名密钥，未随源码发布），
   # 改回内核自带的自动生成密钥；MODULE_SIG_ALL 未开，不会真的签任何模块。
