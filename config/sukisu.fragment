@@ -1,0 +1,6 @@
+# SukiSU 内建（builtin）root 配置片段
+# 追加到 out/.config 后由 olddefconfig 归一化
+CONFIG_KSU=y
+CONFIG_KSU_MANUAL_SU=y
+# 关闭调试与策略隐藏相关的高风险项，首次跑通后再逐项评估
+# CONFIG_KSU_DEBUG is not set

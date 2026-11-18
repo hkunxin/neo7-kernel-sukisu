@@ -1,0 +1,5 @@
+work/
+dist/
+*.log
+*.zip
+assets/boot_stock.img

@@ -1,0 +1,122 @@
+name: build-kernel
+
+on:
+  workflow_dispatch:
+    inputs:
+      ksu:
+        description: 'root 方案'
+        required: true
+        type: choice
+        default: 'sukisu'
+        options: ['sukisu', 'none']
+      susfs:
+        description: 'SUSFS（1 开启 / 0 只编 root）'
+        required: true
+        type: choice
+        default: '1'
+        options: ['1', '0']
+      kernel_commit:
+        description: '内核源码提交'
+        required: true
+        type: string
+        default: '822beed40827f1e9a103bc06ab4714a670080b72'
+      ksu_ref:
+        description: 'SukiSU 引用（tag/commit）'
+        required: false
+        type: string
+        default: 'v3.0.0'
+      susfs_ref:
+        description: 'SUSFS 分支'
+        required: false
+        type: string
+        default: 'gki-android14-6.1'
+      clean:
+        description: '忽略 ccache 全量编译'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  TZ: Asia/Shanghai
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 4G
+  CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+  CCACHE_NOHASHDIR: "true"
+  EXPECTED_RELEASE: 6.1.157-android14-11-o-g7335883bfebb
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 腾出磁盘空间
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: 安装构建依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            ccache lz4 zip unzip cpio rsync python3 dwarves aria2
+
+      - name: ccache 缓存
+        if: ${{ !inputs.clean }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.kernel_commit }}-${{ inputs.ksu_ref }}-${{ inputs.susfs_ref }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.kernel_commit }}-${{ inputs.ksu_ref }}-${{ inputs.susfs_ref }}-
+            ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.kernel_commit }}-
+
+      - name: 下载工具链（Clang 20 r547379）
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/work"
+          cd "$GITHUB_WORKSPACE/work"
+          aria2c -q -s16 -x16 -k1M \
+            "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip" -o clang.zip
+          aria2c -q -s16 -x16 -k1M \
+            "https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/build-tools.zip" -o build-tools.zip
+          mkdir -p clang && unzip -q clang.zip -d clang
+          unzip -q build-tools.zip
+          CLANG_BIN="$(dirname "$(find "$PWD/clang" -name clang -type f | head -n1)")"
+          echo "$CLANG_BIN" >> "$GITHUB_PATH"
+          echo "$PWD/build-tools/bin" >> "$GITHUB_PATH"
+          "$CLANG_BIN/clang" --version | head -n1
+
+      - name: 编译
+        env:
+          KSU: ${{ inputs.ksu }}
+          SUSFS: ${{ inputs.susfs }}
+          KSU_REF: ${{ inputs.ksu_ref }}
+          SUSFS_REF: ${{ inputs.susfs_ref }}
+          KERNEL_COMMIT: ${{ inputs.kernel_commit }}
+          PATH: /usr/lib/ccache:${{ env.PATH }}
+        run: |
+          bash scripts/build.sh 2>&1 | tee build.log
+          ccache -s || true
+
+      - name: 打包 boot.img 与 AK3
+        run: bash scripts/package.sh 2>&1 | tee package.log
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-${{ inputs.ksu }}-susfs${{ inputs.susfs }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            dist/Image
+            dist/boot-*.img
+            dist/AnyKernel3-*.zip
+            dist/config.used
+            dist/SHA256SUMS.txt
+            build.log
+            package.log

@@ -1,0 +1,33 @@
+# 054-内核编译-SukiSU与SUSFS — pinned components
+# 任何一项变动都必须同步更新本文件，并在 README 的「变更记录」里写原因。
+#
+# 设备侧事实（来源：E:\neo7\_analysis）
+device=RMX5060                       # realme Neo7
+rom=RMX5060_17.0.0.105               # ColorOS 17.0.0.105 / CP2A.260605.016
+kernel_release=6.1.157-android14-11-o-g7335883bfebb
+kmi=android14-6.1-11
+#
+# vermagic 证据：vendor_dlkm.img 内 282 处 vermagic 全部为
+#   6.1.157-android14-11-o-g7335883bfebb SMP preempt mod_unload modversions aarch64
+# 因此 UTS_RELEASE 必须逐字一致，见 scripts/build.sh 中的 EXPECTED_RELEASE。
+#
+# 内核基线源码：realme 官方 AndroidB 树仍是 6.1.134，与设备 6.1.157 不符；
+# 使用 OPLUS 公共 MT6989 树（一加 Ace5 竞速版 B/Android16 分支）。
+kernel_repo=OnePlusOSS/android_kernel_oneplus_mt6989
+kernel_branch=oneplus/mt6989_b_16.0.0_ace5_race
+kernel_commit=822beed40827f1e9a103bc06ab4714a670080b72
+#
+# root 方案：SukiSU Ultra（与手机当前 SukiSU 内核模块 v4.3.0 同源）
+# 注意：v3.0.0 起项目更名为 SukiSU-Nova，Kconfig 中已无 CONFIG_KSU_SUSFS。
+ksu_repo=SukiSU-Ultra/SukiSU-Ultra
+ksu_ref=v3.0.0
+#
+# SUSFS 内核侧：官方 susfs4ksu 的 6.1 GKI 分支
+susfs_repo=https://gitlab.com/simonpunk/susfs4ksu
+susfs_branch=gki-android14-6.1
+susfs_commit=f76b81f2a6bf      # 2026-11-15，首次构建时以实际 clone 的 HEAD 回填
+#
+# 工具链
+toolchain_url=https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/clang-r547379.zip
+buildtools_url=https://github.com/cctv18/oneplus_sm8650_toolchain/releases/download/LLVM-Clang20-r547379/build-tools.zip
+magiskboot_url=https://github.com/WildKernels/magiskboot/releases/download/nightly/magiskboot-x86_64

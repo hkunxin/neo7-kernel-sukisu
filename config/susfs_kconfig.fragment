@@ -1,0 +1,55 @@
+# SUSFS 内核侧开关
+# 背景：susfs4ksu 的 6.1 补丁把 CONFIG_KSU_SUSFS* 的 Kconfig 定义放在
+# KernelSU 的 kernel/Kconfig 里（官方 KernelSU 由 10_enable_susfs_for_ksu.patch 注入）。
+# SukiSU v3.0.0（Nova）已重写内核结构，那个补丁无法应用，因此这里补一份最小定义，
+# 只声明内核侧真正被 #ifdef 的符号。
+config KSU_SUSFS
+	bool "Enable SUSFS"
+	default y
+	help
+	  Kernel-side SUSFS. Provides /proc/susfs and the hooks in fs/*.
+
+config KSU_SUSFS_SUS_PATH
+	bool "SUS_PATH"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_SUS_MOUNT
+	bool "SUS_MOUNT"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_SUS_KSTAT
+	bool "SUS_KSTAT"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_SUS_MAP
+	bool "SUS_MAP"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_SPOOF_UNAME
+	bool "SPOOF_UNAME"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG
+	bool "SPOOF_CMDLINE_OR_BOOTCONFIG"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_OPEN_REDIRECT
+	bool "OPEN_REDIRECT"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS
+	bool "HIDE_KSU_SUSFS_SYMBOLS"
+	depends on KSU_SUSFS
+	default y
+
+config KSU_SUSFS_PRIORITY_UID_FILTER
+	bool "PRIORITY_UID_FILTER"
+	depends on KSU_SUSFS
+	default n
