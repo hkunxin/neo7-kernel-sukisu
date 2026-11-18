@@ -128,6 +128,7 @@ jobs:
             dist/boot-*.img
             dist/AnyKernel3-*.zip
             dist/config.used
+            dist/config.diff.txt
             dist/SHA256SUMS.txt
             build.log
             package.log
