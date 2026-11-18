@@ -24,7 +24,7 @@ on:
         description: 'SukiSU 引用（tag/commit）'
         required: false
         type: string
-        default: 'v3.0.0'
+        default: 'builtin'
       susfs_ref:
         description: 'SUSFS 分支'
         required: false

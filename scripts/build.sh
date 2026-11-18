@@ -18,7 +18,7 @@ JOBS="${JOBS:-$(nproc)}"
 KSU="${KSU:-none}"                       # none | sukisu
 SUSFS="${SUSFS:-0}"                      # 0 | 1
 KSU_REPO="${KSU_REPO:-SukiSU-Ultra/SukiSU-Ultra}"
-KSU_REF="${KSU_REF:-v3.0.0}"
+KSU_REF="${KSU_REF:-builtin}"
 SUSFS_REPO="${SUSFS_REPO:-https://gitlab.com/simonpunk/susfs4ksu}"
 SUSFS_REF="${SUSFS_REF:-gki-android14-6.1}"
 KERNEL_REPO="${KERNEL_REPO:-OnePlusOSS/android_kernel_oneplus_mt6989}"
@@ -164,10 +164,9 @@ apply_susfs() {
   find "$SRC" -name '*.rej' -delete
   echo "[OK] namespace.c include 块已用 fixup 补齐（patch 退出码 $prc）"
 
-  # susfs.c 需要的 susfs_is_current_ksu_domain() 由 KSU 提供，Nova 侧叫 is_ksu_domain()
-  cp "$ROOT/patches/susfs_ksu_compat.c" "$SRC/fs/susfs_ksu_compat.c"
-  grep -q "susfs_ksu_compat" "$SRC/fs/Makefile" \
-    || echo 'obj-$(CONFIG_KSU_SUSFS) += susfs_ksu_compat.o' >> "$SRC/fs/Makefile"
+  # 注意：builtin 分支的 kernel/selinux/selinux.c 已提供 susfs_is_current_ksu_domain()，
+  # kernel/{feature/sucompat.c,runtime/ksud.c,preinit/preinit.c,supercall/*} 提供
+  # ksu_handle_* 全套钩子，因此这里不能再放兼容层，否则符号重复定义。
   echo "SUSFS 提交：$(cd "$WORK/susfs4ksu" && git rev-parse --short HEAD)"
 }
 

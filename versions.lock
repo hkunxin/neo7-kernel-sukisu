@@ -18,9 +18,14 @@ kernel_branch=oneplus/mt6989_b_16.0.0_ace5_race
 kernel_commit=822beed40827f1e9a103bc06ab4714a670080b72
 #
 # root 方案：SukiSU Ultra（与手机当前 SukiSU 内核模块 v4.3.0 同源）
-# 注意：v3.0.0 起项目更名为 SukiSU-Nova，Kconfig 中已无 CONFIG_KSU_SUSFS。
+# 分支说明（官方集成指导 docs/zh/guide/how-to-integrate.md）：
+#   main    → 运行时 kprobes + sys_enter tracepoint，不需要改内核源码；Kconfig 无 SUSFS
+#   builtin → 手动 hook，内核源码里由 SUSFS 补丁写入 ksu_handle_* 调用；Kconfig 自带
+#             "KernelSU - SUSFS" 菜单与 susfs_is_current_ksu_domain()/SID 缓存
+# 因此要 SUSFS 必须用 builtin，且不能再叠加 SukiSU_patch/hooks 的手动 hook 补丁
+# （那份补丁用的是非 SUSFS 签名，会与 sucompat.h 的 SUSFS 版签名冲突）。
 ksu_repo=SukiSU-Ultra/SukiSU-Ultra
-ksu_ref=v3.0.0
+ksu_ref=builtin
 #
 # SUSFS 内核侧：官方 susfs4ksu 的 6.1 GKI 分支
 susfs_repo=https://gitlab.com/simonpunk/susfs4ksu
