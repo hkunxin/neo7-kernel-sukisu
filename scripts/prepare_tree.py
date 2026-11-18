@@ -30,7 +30,7 @@ def write(path, text):
 
 
 # ---------------------------------------------------------------- Kconfig
-SRC_RE = re.compile(r'^(\s*)source\s+"([^"$]+)"\s*$', re.M)
+SRC_RE = re.compile(r'^(\s*)source\s+"([^"]+)"\s*$', re.M)
 
 for root, _dirs, files in os.walk(src):
     if os.sep + ".git" in root:
@@ -47,7 +47,11 @@ for root, _dirs, files in os.walk(src):
             continue
 
         def repl(m):
-            indent, rel = m.group(1), m.group(2)
+            indent, raw = m.group(1), m.group(2)
+            # OPLUS 用 $(KCONFIG_EXT_PREFIX) 做前缀，本树里它为空
+            rel = raw.replace("$(KCONFIG_EXT_PREFIX)", "").replace("${KCONFIG_EXT_PREFIX}", "")
+            if "$" in rel:
+                return m.group(0)  # 其它变量路径不动
             if rel.startswith("/"):
                 target = os.path.normpath(rel)
             else:
@@ -56,8 +60,8 @@ for root, _dirs, files in os.walk(src):
             # source 必须指向真实文件；symlink 残骸（普通文件/空目录）不算
             if os.path.isfile(target) or os.path.isfile(sibling):
                 return m.group(0)
-            changes.append(("Kconfig", os.path.relpath(path, src), rel))
-            return f'{indent}# source "{rel}"   # [prepare] missing upstream'
+            changes.append(("Kconfig", os.path.relpath(path, src), raw))
+            return f'{indent}# source "{raw}"   # [prepare] missing upstream'
 
         new = SRC_RE.sub(repl, text)
         if new != text:
