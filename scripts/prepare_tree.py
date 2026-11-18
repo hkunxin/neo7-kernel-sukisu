@@ -88,10 +88,10 @@ for root, _dirs, files in os.walk(src):
             continue
         for m in INC_RE.finditer(text):
             rel = m.group(1)
-            if rel.startswith(SKIP_PREFIX) or "$" in rel:
+            # 只处理 OPLUS 的典型写法：跨目录相对 include（../vendor 方向的软链）
+            if not rel.startswith("../"):
                 continue
-            # 只处理「带路径分隔符」的引用，避免误伤 -I 搜索路径里的同名头
-            if "/" not in rel and not rel.endswith(".h"):
+            if "$" in rel:
                 continue
             cand = os.path.normpath(os.path.join(root, rel))
             if not cand.startswith(src):
