@@ -161,6 +161,9 @@ for root, _dirs, files in os.walk(src):
 
     def repl_line(m):
         indent, prefix, body = m.group(1), m.group(2), m.group(3)
+        # 多行续行（行尾反斜杠）整段跳过：单独改第一行会把后续续行变成孤儿
+        if body.rstrip().endswith("\\") or "\\" in body:
+            return m.group(0)
         if "$(" in body:  # 变量展开的列表不动
             return m.group(0)
         keep, dropped = [], []
