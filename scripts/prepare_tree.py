@@ -68,13 +68,29 @@ for root, _dirs, files in os.walk(src):
 # OPLUS 把若干头文件做成 symlink 指向 vendor/oplus/...（未公开），zip 归档里
 # 有时连残骸都不留，而内核却无条件 include 它们。按显式清单补空桩，可审计、不误伤：
 # 这些头只提供 OPLUS 私有锁/调度实现，关掉对应 CONFIG 后内核不引用其中任何符号。
-STUB_HEADERS = [
-    "kernel/locking/locking_main.h",      # kernel/sched/core.c 无条件 include
-    "kernel/locking/sa_common_struct.h",  # OPLUS 锁实现公共结构
-    "mm/mm-trace.h",                      # mm/vmscan.c include
-]
+STUB_HEADERS = {
+    # kernel/sched/core.c 在 __schedule() 里无条件调用它；原实现只是 OPLUS 的
+    # 锁竞争统计，置空不影响调度语义。
+    "kernel/locking/locking_main.h": """/* [prepare] stub: 原文件是 symlink 指向 vendor/oplus/kernel/synchronize/oplus_locking.h */
+#ifndef _OPLUS_LOCKING_MAIN_STUB_H
+#define _OPLUS_LOCKING_MAIN_STUB_H
+struct task_struct;
+static inline void locking_record_switch_in_cs(struct task_struct *p) { (void)p; }
+#endif
+""",
+    "kernel/locking/sa_common_struct.h": """/* [prepare] stub: 原文件是 symlink 指向未公开的 OPLUS 锁实现 */
+#ifndef _OPLUS_SA_COMMON_STRUCT_STUB_H
+#define _OPLUS_SA_COMMON_STRUCT_STUB_H
+#endif
+""",
+    "mm/mm-trace.h": """/* [prepare] stub: 原文件是 symlink 指向 vendor/oplus/kernel/mm/mm_osvelte/mm-trace.h */
+#ifndef _OPLUS_MM_TRACE_STUB_H
+#define _OPLUS_MM_TRACE_STUB_H
+#endif
+""",
+}
 
-for rel in STUB_HEADERS:
+for rel, content in STUB_HEADERS.items():
     target = os.path.join(src, rel)
     try:
         # 树里可能是「悬空软链接」——isfile/exists 都是 False，但 open 会跟着
@@ -85,7 +101,7 @@ for rel in STUB_HEADERS:
             continue
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(f"/* [prepare] stub: {rel} is a symlink to unpublished vendor/oplus source */\n")
+            fh.write(content)
         changes.append(("stub-header", rel, "explicit"))
     except OSError as exc:
         changes.append(("stub-failed", rel, str(exc)))
