@@ -64,7 +64,50 @@ for root, _dirs, files in os.walk(src):
             changes.append(("dangling", os.path.relpath(path, src), target))
 
 
-# ---------------------------------------------------------------- Kconfig
+# ---------------------------------------------------------------- 悬空 include
+# 例：kernel/sched/core.c 里 #include "../locking/locking_main.h"，
+# 而 kernel/locking/locking_main.h 是 symlink 到 vendor/oplus/...（未公开）。
+# zip 归档有时连残骸都不留，所以直接按「被 include 的相对路径」补空桩。
+INC_RE = re.compile(r'^\s*#\s*include\s+[<"]([^">]+)[">]', re.M)
+SKIP_PREFIX = ("linux/", "asm/", "asm-generic/", "uapi/", "generated/", "trace/",
+               "net/", "crypto/", "sound/", "media/", "dt-bindings/", "kunit/",
+               "vdso/", "soc/", "rdma/", "misc/", "drm/", "keys/", "kvm/")
+
+for root, _dirs, files in os.walk(src):
+    if os.sep + ".git" in root:
+        continue
+    for f in files:
+        if not f.endswith((".c", ".h", ".S")):
+            continue
+        path = os.path.join(root, f)
+        try:
+            text = read(path)
+        except OSError:
+            continue
+        if "#include" not in text:
+            continue
+        for m in INC_RE.finditer(text):
+            rel = m.group(1)
+            if rel.startswith(SKIP_PREFIX) or "$" in rel:
+                continue
+            # 只处理「带路径分隔符」的引用，避免误伤 -I 搜索路径里的同名头
+            if "/" not in rel and not rel.endswith(".h"):
+                continue
+            cand = os.path.normpath(os.path.join(root, rel))
+            if not cand.startswith(src):
+                continue
+            if os.path.exists(cand) or os.path.exists(os.path.normpath(os.path.join(src, rel))):
+                continue
+            try:
+                os.makedirs(os.path.dirname(cand), exist_ok=True)
+                with open(cand, "w", encoding="utf-8", newline="\n") as fh:
+                    fh.write(f"/* [prepare] stub: {rel} included by "
+                             f"{os.path.relpath(path, src)} but not published */\n")
+                changes.append(("stub-include", os.path.relpath(cand, src),
+                                os.path.relpath(path, src)))
+            except OSError as exc:
+                changes.append(("stub-failed", rel, str(exc)))
+
 SRC_RE = re.compile(r'^(\s*)source\s+"([^"]+)"\s*$', re.M)
 
 for root, _dirs, files in os.walk(src):
@@ -138,7 +181,7 @@ for root, _dirs, files in os.walk(src):
     if new != text:
         write(path, new)
 
-print(f"[prepare] 注释掉 {len(changes)} 处指向未公开目录的引用")
+print(f"[prepare] 处理 {len(changes)} 处未公开依赖")
 for kind, where, what in changes[:40]:
     print(f"  - [{kind}] {where}: {what}")
 if len(changes) > 40:
