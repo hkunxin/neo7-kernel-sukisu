@@ -76,9 +76,13 @@ STUB_HEADERS = [
 
 for rel in STUB_HEADERS:
     target = os.path.join(src, rel)
-    if os.path.isfile(target) and os.path.getsize(target) > 0:
-        continue
     try:
+        # 树里可能是「悬空软链接」——isfile/exists 都是 False，但 open 会跟着
+        # 链接写到不存在的 vendor 路径上并报 ENOENT，必须先摘掉链接。
+        if os.path.islink(target):
+            os.remove(target)
+        elif os.path.isfile(target) and os.path.getsize(target) > 0:
+            continue
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(f"/* [prepare] stub: {rel} is a symlink to unpublished vendor/oplus source */\n")
