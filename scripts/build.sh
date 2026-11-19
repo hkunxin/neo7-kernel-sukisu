@@ -248,7 +248,8 @@ verify() {
   cp "$OUT/.config" "$DIST/config.used"
   # 产物带上 Module.symvers / System.map：用于离线比对 vendor 模块的符号 CRC，
   # 避免「模块加载失败」只能靠反复刷机试错
-  cp "$OUT/Module.symvers" "$DIST/Module.symvers" 2>/dev/null || true
+  cp "$OUT/vmlinux.symvers" "$DIST/vmlinux.symvers" 2>/dev/null || \
+    cp "$OUT/Module.symvers" "$DIST/vmlinux.symvers" 2>/dev/null || true
   cp "$OUT/System.map" "$DIST/System.map" 2>/dev/null || true
   echo "[OK] Image 大小：$(du -h "$DIST/Image" | cut -f1)"
 }
