@@ -15,6 +15,12 @@ on:
         type: choice
         default: '1'
         options: ['1', '0']
+      config_profile:
+        description: '配置来源：base=社区基线(能编过) / stock=原厂105提取(最接近原厂)'
+        required: true
+        type: choice
+        default: 'base'
+        options: ['base', 'stock']
       perf:
         description: '性能向（1 关 KASAN/SLUB_DEBUG 等调试开销 + BBR + -O3）'
         required: true
@@ -109,6 +115,7 @@ jobs:
           KSU: ${{ inputs.ksu }}
           SUSFS: ${{ inputs.susfs }}
           PERF: ${{ inputs.perf }}
+          CONFIG_PROFILE: ${{ inputs.config_profile }}
           KSU_REF: ${{ inputs.ksu_ref }}
           SUSFS_REF: ${{ inputs.susfs_ref }}
           KERNEL_COMMIT: ${{ inputs.kernel_commit }}
@@ -127,7 +134,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-${{ inputs.ksu }}-susfs${{ inputs.susfs }}-perf${{ inputs.perf }}
+          name: kernel-${{ inputs.ksu }}-susfs${{ inputs.susfs }}-perf${{ inputs.perf }}-cfg${{ inputs.config_profile }}
           if-no-files-found: warn
           retention-days: 14
           path: |

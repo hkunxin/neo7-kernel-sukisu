@@ -24,7 +24,14 @@ SUSFS_REPO="${SUSFS_REPO:-https://gitlab.com/simonpunk/susfs4ksu}"
 SUSFS_REF="${SUSFS_REF:-gki-android14-6.1}"
 KERNEL_REPO="${KERNEL_REPO:-OnePlusOSS/android_kernel_oneplus_mt6989}"
 KERNEL_COMMIT="${KERNEL_COMMIT:-822beed40827f1e9a103bc06ab4714a670080b72}"
-CONFIG_IN="${CONFIG_IN:-$ROOT/config/base_6.1.157.config}"
+# CONFIG_PROFILE=base  社区已跑通的 6.1.157 配置（默认，能编过）
+# CONFIG_PROFILE=stock 原厂 105 提取的配置（最接近原厂，但依赖未公开源码，可能编不过）
+CONFIG_PROFILE="${CONFIG_PROFILE:-base}"
+if [[ "$CONFIG_PROFILE" == "stock" ]]; then
+  CONFIG_IN="${CONFIG_IN:-$ROOT/config/rmx5060_105_stock.config}"
+else
+  CONFIG_IN="${CONFIG_IN:-$ROOT/config/base_6.1.157.config}"
+fi
 
 # 与 vendor_dlkm 模块的 vermagic 逐字一致，改这里等于让 270+ 个模块全部加载失败
 EXPECTED_RELEASE="${EXPECTED_RELEASE:-6.1.157-android14-11-o-g7335883bfebb}"
