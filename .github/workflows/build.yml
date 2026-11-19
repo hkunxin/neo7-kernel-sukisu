@@ -20,7 +20,7 @@ on:
         required: true
         type: choice
         default: 'base'
-        options: ['base', 'stock']
+        options: ['base', 'stock', 'gki']
       perf:
         description: '性能向（1 关 KASAN/SLUB_DEBUG 等调试开销 + BBR + -O3）'
         required: true

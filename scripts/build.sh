@@ -25,7 +25,8 @@ SUSFS_REF="${SUSFS_REF:-gki-android14-6.1}"
 KERNEL_REPO="${KERNEL_REPO:-OnePlusOSS/android_kernel_oneplus_mt6989}"
 KERNEL_COMMIT="${KERNEL_COMMIT:-822beed40827f1e9a103bc06ab4714a670080b72}"
 # CONFIG_PROFILE=base  社区已跑通的 6.1.157 配置（默认，能编过）
-# CONFIG_PROFILE=stock 原厂 105 提取的配置（最接近原厂，但依赖未公开源码，可能编不过）
+# CONFIG_PROFILE=stock 原厂 105 提取的配置
+# CONFIG_PROFILE=gki   纯 GKI（gki_defconfig + 最小追加），社区验证可启动的配方
 CONFIG_PROFILE="${CONFIG_PROFILE:-base}"
 if [[ "$CONFIG_PROFILE" == "stock" ]]; then
   CONFIG_IN="${CONFIG_IN:-$ROOT/config/rmx5060_105_stock.config}"
@@ -67,9 +68,15 @@ apply_config() {
   log "预处理源码树（补悬空 Kconfig/Makefile 引用）"
   python3 "$ROOT/scripts/prepare_tree.py" "$SRC"
 
-  log "应用配置基线（$(basename "$CONFIG_IN")，$(wc -l < "$CONFIG_IN") 行）"
-  cp "$CONFIG_IN" "$SRC/arch/arm64/configs/neo7_defconfig"
-  make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 neo7_defconfig >/dev/null
+  if [[ "$CONFIG_PROFILE" == "gki" ]]; then
+    log "使用 gki_defconfig（纯 GKI，设备驱动由 vendor_dlkm 模块提供）"
+    make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 gki_defconfig >/dev/null
+    cat "$ROOT/config/gki_extra.fragment" >> "$OUT/.config"
+  else
+    log "应用配置基线（$(basename "$CONFIG_IN")，$(wc -l < "$CONFIG_IN") 行）"
+    cp "$CONFIG_IN" "$SRC/arch/arm64/configs/neo7_defconfig"
+    make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 neo7_defconfig >/dev/null
+  fi
 
   # 钉死 UTS_RELEASE。
   # 原厂 CONFIG_LOCALVERSION 为空，后缀由 OPLUS 改造过的 scripts/setlocalversion
@@ -212,6 +219,20 @@ apply_perf() {
   echo "[OK] perf: KASAN/SLUB_DEBUG/SCHEDSTATS 关闭，BBR 默认（DEBUG_LIST 被 BUG_ON_DATA_CORRUPTION 强制保留）"
 }
 
+# ------------------------------------------------------- 3.7 模块 CRC 放行
+# 跨 OEM 树编出来的内核，导出符号 CRC 必然与原厂模块记录的不一致
+# （CONFIG_MODVERSIONS 下 check_version() 会直接拒绝加载）。
+# 社区做法（cctv18/oppo_oplus_realme_sm8650）就是把 CRC 比对改成只告警不拒绝。
+apply_crc_relax() {
+  log "放行模块符号 CRC 校验（跨树编译必需）"
+  ( cd "$SRC" && patch -p1 --forward --no-backup-if-mismatch \
+      < "$ROOT/patches/disable_module_crc_check.patch" ) || true
+  grep -q "But ignore" "$SRC/kernel/module/version.c" \
+    || die "CRC 放行补丁未生效（kernel/module/version.c）"
+  find "$SRC" -name '*.rej' -delete
+  echo "[OK] 模块 CRC 不一致只告警，不再拒绝加载"
+}
+
 # ---------------------------------------------------------------- 4. 编译
 build_kernel() {
   log "编译 Image（-j$JOBS）"
@@ -267,6 +288,7 @@ apply_sukisu
 apply_susfs
 apply_root_config
 apply_perf
+apply_crc_relax
 build_kernel
 verify
 log "完成：$DIST"

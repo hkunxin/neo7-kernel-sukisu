@@ -1,0 +1,19 @@
+# gki_defconfig 追加项（照 cctv18 的配方）
+# 他们只往 gki_defconfig 里加这些，不碰任何 MTK 驱动——因为这台机器的存储/显示
+# 等必需驱动都在 vendor_dlkm 里以模块形式存在，纯 GKI 内核 + OEM 模块即可启动。
+
+# Mountify（backslashxx/mountify）需要
+CONFIG_TMPFS_XATTR=y
+CONFIG_TMPFS_POSIX_ACL=y
+
+# 编译优化（-O2）
+CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
+
+# 跳过 uapi 头安装，省编译时间（不影响内核本体）
+CONFIG_HEADERS_INSTALL=n
+
+# 抓崩溃现场用
+CONFIG_PSTORE=y
+CONFIG_PSTORE_RAM=y
+CONFIG_PSTORE_CONSOLE=y
+CONFIG_PSTORE_PMSG=y
