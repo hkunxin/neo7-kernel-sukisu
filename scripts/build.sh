@@ -17,7 +17,7 @@ JOBS="${JOBS:-$(nproc)}"
 
 KSU="${KSU:-none}"                       # none | sukisu
 SUSFS="${SUSFS:-0}"                      # 0 | 1
-PERF="${PERF:-0}"                        # 0 | 1 性能向（关调试开销 + BBR + -O3）
+PERF="${PERF:-0}"                        # 0 | 1 性能向（关调试开销 + BBR）
 KSU_REPO="${KSU_REPO:-SukiSU-Ultra/SukiSU-Ultra}"
 KSU_REF="${KSU_REF:-builtin}"
 SUSFS_REPO="${SUSFS_REPO:-https://gitlab.com/simonpunk/susfs4ksu}"
@@ -209,10 +209,11 @@ apply_perf() {
 build_kernel() {
   log "编译 Image（-j$JOBS）"
   local t0; t0=$(date +%s)
-  local opt=""
-  [[ "$PERF" == "1" ]] && opt=" -O3"
+  # 不用 -O3：实测在 drivers/kernelsu/ksu_main.o 触发 fortify-string.h 的
+  # __read_overflow（error 属性，-Wno-error 压不住），而 -O3 相对 -O2 的收益
+  # 在这一档里远小于「关掉 KASAN/SLUB_DEBUG」的收益，不值得为它改 KSU 源码。
   make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 -j"$JOBS" \
-    KCFLAGS="-Wno-error${opt}" Image
+    KCFLAGS="-Wno-error" Image
   echo "编译耗时：$(( $(date +%s) - t0 )) 秒"
 }
 
