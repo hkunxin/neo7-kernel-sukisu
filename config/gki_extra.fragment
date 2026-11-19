@@ -9,8 +9,11 @@ CONFIG_TMPFS_POSIX_ACL=y
 # 编译优化（-O2）
 CONFIG_CC_OPTIMIZE_FOR_PERFORMANCE=y
 
-# 跳过 uapi 头安装，省编译时间（不影响内核本体）
-CONFIG_HEADERS_INSTALL=n
+# 注意：不要设 CONFIG_HEADERS_INSTALL=n。
+# SukiSU builtin 的 drivers/kernelsu/Makefile 会检查 $(obj)/usr/include 是否存在，
+# 缺了就把 preinit 关掉（"KernelSU: ./usr/include not found, preinit disabled"），
+# 而 SUSFS 补丁的 fs/exec.c 又引用 ksu_preinit_handle_post_execveat ->
+# 链接期 undefined symbol。(cctv18 用 KernelSU-Next 不依赖它，所以他能省。)
 
 # 抓崩溃现场用
 CONFIG_PSTORE=y
