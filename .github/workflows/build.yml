@@ -15,6 +15,12 @@ on:
         type: choice
         default: '1'
         options: ['1', '0']
+      perf:
+        description: '性能向（1 关 KASAN/SLUB_DEBUG 等调试开销 + BBR + -O3）'
+        required: true
+        type: choice
+        default: '0'
+        options: ['0', '1']
       kernel_commit:
         description: '内核源码提交'
         required: true
@@ -71,10 +77,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.kernel_commit }}-${{ inputs.ksu_ref }}-${{ inputs.susfs_ref }}-${{ github.run_id }}
+          key: ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.perf }}-${{ inputs.kernel_commit }}-${{ inputs.ksu_ref }}-${{ inputs.susfs_ref }}-${{ github.run_id }}
           restore-keys: |
-            ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.kernel_commit }}-${{ inputs.ksu_ref }}-${{ inputs.susfs_ref }}-
-            ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.kernel_commit }}-
+            ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.perf }}-${{ inputs.kernel_commit }}-${{ inputs.ksu_ref }}-${{ inputs.susfs_ref }}-
+            ccache-${{ inputs.ksu }}-${{ inputs.susfs }}-${{ inputs.perf }}-${{ inputs.kernel_commit }}-
 
       - name: 下载工具链（Clang 20 r547379）
         run: |
@@ -102,6 +108,7 @@ jobs:
         env:
           KSU: ${{ inputs.ksu }}
           SUSFS: ${{ inputs.susfs }}
+          PERF: ${{ inputs.perf }}
           KSU_REF: ${{ inputs.ksu_ref }}
           SUSFS_REF: ${{ inputs.susfs_ref }}
           KERNEL_COMMIT: ${{ inputs.kernel_commit }}
@@ -120,7 +127,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: kernel-${{ inputs.ksu }}-susfs${{ inputs.susfs }}
+          name: kernel-${{ inputs.ksu }}-susfs${{ inputs.susfs }}-perf${{ inputs.perf }}
           if-no-files-found: warn
           retention-days: 14
           path: |

@@ -1,0 +1,25 @@
+# 性能向配置片段（PERF=1 时追加，之后 olddefconfig 归一化）
+#
+# 依据：
+#   1. 原厂 105 的 boot.img 提取配置与社区基线 config 都开着
+#      KASAN / SLUB_DEBUG / DEBUG_LIST / INIT_ON_ALLOC_DEFAULT_ON / SCHEDSTATS，
+#      这些是排障用的，日常运行只增加开销（KASAN_HW_TAGS 走 MTE，开销最明显）。
+#   2. 关 KASAN 不会破坏 vendor 模块加载：已对 vendor_dlkm.img(30MB) 与
+#      system_dlkm.img(7MB) 全量 grep，__asan_* / __kasan_* / __hwasan 命中数均为 0，
+#      即 OEM 的 .ko 未做 KASAN 插桩，不依赖内核侧这些符号。
+#
+# 保留不动的项（有明确用途，不要为了性能关掉）：
+#   FTRACE（atrace/perfetto 依赖）、PSI、LRU_GEN(MGLRU)、KALLSYMS_ALL（KPM 依赖）、
+#   CFI_CLANG / SHADOW_CALL_STACK / STACKPROTECTOR / HARDENED_USERCOPY（安全项）
+
+# --- 运行时调试开销 ---
+# CONFIG_KASAN is not set
+# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
+# CONFIG_SLUB_DEBUG is not set
+# CONFIG_DEBUG_LIST is not set
+# CONFIG_SCHEDSTATS is not set
+# CONFIG_SCHED_DEBUG is not set
+
+# --- 网络：BBR 默认拥塞控制（FQ 已在基线中启用） ---
+CONFIG_TCP_CONG_BBR=y
+CONFIG_DEFAULT_TCP_CONG="bbr"

@@ -17,6 +17,7 @@ JOBS="${JOBS:-$(nproc)}"
 
 KSU="${KSU:-none}"                       # none | sukisu
 SUSFS="${SUSFS:-0}"                      # 0 | 1
+PERF="${PERF:-0}"                        # 0 | 1 性能向（关调试开销 + BBR + -O3）
 KSU_REPO="${KSU_REPO:-SukiSU-Ultra/SukiSU-Ultra}"
 KSU_REF="${KSU_REF:-builtin}"
 SUSFS_REPO="${SUSFS_REPO:-https://gitlab.com/simonpunk/susfs4ksu}"
@@ -189,12 +190,29 @@ apply_root_config() {
   echo "[OK] KSU=$(grep -c '^CONFIG_KSU=y' "$OUT/.config") SUSFS=$(grep -c '^CONFIG_KSU_SUSFS=y' "$OUT/.config")"
 }
 
+# ------------------------------------------------------- 3.6 性能向配置
+apply_perf() {
+  [[ "$PERF" == "1" ]] || return 0
+  log "追加性能向配置（config/perf.fragment）"
+  cat "$ROOT/config/perf.fragment" >> "$OUT/.config"
+  make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 olddefconfig >/dev/null
+
+  grep -qx "CONFIG_KASAN=y" "$OUT/.config" && die "KASAN 未关掉"
+  grep -qx "CONFIG_SLUB_DEBUG=y" "$OUT/.config" && die "SLUB_DEBUG 未关掉"
+  grep -qx "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" "$OUT/.config" && die "INIT_ON_ALLOC 未关掉"
+  grep -qx 'CONFIG_DEFAULT_TCP_CONG="bbr"' "$OUT/.config" || die "BBR 未生效"
+  cp "$OUT/.config" "$DIST/config.used"
+  echo "[OK] perf: KASAN/SLUB_DEBUG/DEBUG_LIST/SCHEDSTATS 关闭，BBR 默认"
+}
+
 # ---------------------------------------------------------------- 4. 编译
 build_kernel() {
   log "编译 Image（-j$JOBS）"
   local t0; t0=$(date +%s)
+  local opt=""
+  [[ "$PERF" == "1" ]] && opt=" -O3"
   make -C "$SRC" O="$OUT" ARCH=arm64 LLVM=1 -j"$JOBS" \
-    KCFLAGS="-Wno-error" Image
+    KCFLAGS="-Wno-error${opt}" Image
   echo "编译耗时：$(( $(date +%s) - t0 )) 秒"
 }
 
@@ -235,6 +253,7 @@ apply_config
 apply_sukisu
 apply_susfs
 apply_root_config
+apply_perf
 build_kernel
 verify
 log "完成：$DIST"
