@@ -202,7 +202,7 @@ apply_perf() {
   grep -qx "CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y" "$OUT/.config" && die "INIT_ON_ALLOC 未关掉"
   grep -qx 'CONFIG_DEFAULT_TCP_CONG="bbr"' "$OUT/.config" || die "BBR 未生效"
   cp "$OUT/.config" "$DIST/config.used"
-  echo "[OK] perf: KASAN/SLUB_DEBUG/DEBUG_LIST/SCHEDSTATS 关闭，BBR 默认"
+  echo "[OK] perf: KASAN/SLUB_DEBUG/SCHEDSTATS 关闭，BBR 默认（DEBUG_LIST 被 BUG_ON_DATA_CORRUPTION 强制保留）"
 }
 
 # ---------------------------------------------------------------- 4. 编译

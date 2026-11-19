@@ -16,7 +16,8 @@
 # CONFIG_KASAN is not set
 # CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
 # CONFIG_SLUB_DEBUG is not set
-# CONFIG_DEBUG_LIST is not set
+# 注：CONFIG_DEBUG_LIST 关不掉——它被 CONFIG_BUG_ON_DATA_CORRUPTION=y select，
+# 而后者是「链表损坏直接 panic」的安全项，保留（开销远小于 KASAN）。
 # CONFIG_SCHEDSTATS is not set
 # CONFIG_SCHED_DEBUG is not set
 
