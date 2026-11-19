@@ -136,6 +136,8 @@ jobs:
             dist/AnyKernel3-*.zip
             dist/config.used
             dist/config.diff.txt
+            dist/Module.symvers
+            dist/System.map
             dist/SHA256SUMS.txt
             build.log
             package.log
