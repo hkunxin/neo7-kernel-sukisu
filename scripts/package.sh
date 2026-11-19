@@ -43,6 +43,20 @@ cp "$STOCK" "$RB/boot.img"
   "$MB" repack boot.img
 )
 [[ -f "$RB/new-boot.img" ]] || die "repack 未产出 new-boot.img"
+
+# [054] 往 boot 头里塞 cmdline：把早期 initcall 与 printk 全部说出来，
+# 失败时 panic 写进 ramoops 的 dmesg 才能看到死在哪一步。
+python3 - "$RB/new-boot.img" <<'EOPY'
+import sys
+p = sys.argv[1]
+cmd = b"loglevel=8 ignore_loglevel initcall_debug printk.devkmsg=on"
+d = bytearray(open(p, "rb").read())
+assert d[:8] == b"ANDROID!", "not a boot image"
+assert len(cmd) < 1536
+d[44:44 + 1536] = cmd.ljust(1536, b"\x00")
+open(p, "wb").write(d)
+print("[package] cmdline 注入:", cmd.decode())
+EOPY
 cp "$RB/new-boot.img" "$DIST/boot-${RELEASE}.img"
 
 sz=$(stat -c %s "$DIST/boot-${RELEASE}.img")

@@ -20,3 +20,12 @@ CONFIG_PSTORE=y
 CONFIG_PSTORE_RAM=y
 CONFIG_PSTORE_CONSOLE=y
 CONFIG_PSTORE_PMSG=y
+
+# --- 失败取证：让 hang 变成 panic ---
+# 之前只有 console-ramoops，每次启动都会被覆盖；hang 又不写 dmesg-ramoops，
+# 所以失败后什么都拿不到。开启下面三项后，卡死会自动 panic，
+# panic 时 kmsg_dump 会把 dmesg 写进独立的 ramoops 区，重启不丢。
+# 0 = panic 后停住不自动重启，避免 bootloop；手动长按电源进 fastboot 再刷回原厂
+CONFIG_PANIC_TIMEOUT=0
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
