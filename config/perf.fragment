@@ -21,5 +21,7 @@
 # CONFIG_SCHED_DEBUG is not set
 
 # --- 网络：BBR 默认拥塞控制（FQ 已在基线中启用） ---
+# 注意：DEFAULT_TCP_CONG 是 choice，必须选 CONFIG_DEFAULT_BBR，
+# 直接写 CONFIG_DEFAULT_TCP_CONG="bbr" 会被 kconfig 覆盖回 cubic。
 CONFIG_TCP_CONG_BBR=y
-CONFIG_DEFAULT_TCP_CONG="bbr"
+CONFIG_DEFAULT_BBR=y
